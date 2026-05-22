@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fake News Detector</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container { width: 100%; max-width: 680px; padding: 2rem; }
+    h1 { font-size: 28px; font-weight: 600; margin-bottom: 6px; }
+    .sub { font-size: 14px; color: #888; margin-bottom: 2rem; }
+    label { font-size: 13px; color: #aaa; display: block; margin-bottom: 6px; }
+    textarea {
+      width: 100%;
+      min-height: 160px;
+      padding: 14px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      border-radius: 10px;
+      color: #e0e0e0;
+      font-size: 14px;
+      resize: vertical;
+      font-family: inherit;
+    }
+    textarea:focus { outline: none; border-color: #555; }
+    .btn {
+      margin-top: 12px;
+      padding: 11px 28px;
+      font-size: 14px;
+      font-weight: 500;
+      border: 1px solid #444;
+      border-radius: 8px;
+      background: #1e1e1e;
+      color: #e0e0e0;
+      cursor: pointer;
+    }
+    .btn:hover { background: #252525; }
+    .result-card {
+      margin-top: 1.5rem;
+      padding: 1.5rem;
+      border-radius: 12px;
+      border: 1px solid #2a2a2a;
+      background: #161616;
+      display: none;
+    }
+    .verdict { display: flex; align-items: center; gap: 12px; margin-bottom: 1.2rem; }
+    .badge { padding: 5px 16px; border-radius: 100px; font-size: 13px; font-weight: 600; }
+    .fake { background: #3a0a0a; color: #f87171; }
+    .real { background: #0a2a0a; color: #86efac; }
+    .conf { font-size: 13px; color: #888; }
+    .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .bar-lbl { font-size: 12px; color: #888; width: 32px; }
+    .bar-track {
+      flex: 1; height: 8px; border-radius: 100px;
+      background: #2a2a2a; overflow: hidden;
+    }
+    .bar-fill { height: 100%; border-radius: 100px; transition: width 0.5s ease; }
+    .fill-fake { background: #ef4444; }
+    .fill-real { background: #22c55e; }
+    .bar-pct { font-size: 12px; color: #888; min-width: 40px; text-align: right; }
+    #error { color: #f87171; font-size: 13px; margin-top: 8px; display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Fake News Detector</h1>
+    <p class="sub">Paste any news text — the ML model classifies it instantly.</p>
+
+    <label for="news-input">News article or headline</label>
+    <textarea id="news-input" placeholder="Paste your news text here..."></textarea>
+
+    <br>
+    <button class="btn" onclick="detect()">Analyze</button>
+    <p id="error"></p>
+
+    <div class="result-card" id="result-card">
+      <div class="verdict">
+        <span class="badge" id="badge">FAKE</span>
+        <span class="conf">Confidence: <strong id="conf"></strong></span>
+      </div>
+      <p style="font-size:12px; color:#666; margin-bottom:10px;">Probability breakdown</p>
+      <div class="bar-row">
+        <span class="bar-lbl">Fake</span>
+        <div class="bar-track">
+          <div class="bar-fill fill-fake" id="bar-fake" style="width:0%"></div>
+        </div>
+        <span class="bar-pct" id="pct-fake">0%</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-lbl">Real</span>
+        <div class="bar-track">
+          <div class="bar-fill fill-real" id="bar-real" style="width:0%"></div>
+        </div>
+        <span class="bar-pct" id="pct-real">0%</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function detect() {
+      const text = document.getElementById("news-input").value.trim();
+      const err = document.getElementById("error");
+      const card = document.getElementById("result-card");
+      err.style.display = "none";
+
+      if (!text || text.split(" ").length < 5) {
+        err.textContent = "Please enter at least 5 words.";
+        err.style.display = "block";
+        return;
+      }
+
+      const res = await fetch("/predict", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text })
+      });
+
+      const data = await res.json();
+
+      if (data.error) {
+        err.textContent = data.error;
+        err.style.display = "block";
+        return;
+      }
+
+      document.getElementById("badge").textContent = data.label;
+      document.getElementById("badge").className = "badge " + data.label.toLowerCase();
+      document.getElementById("conf").textContent = data.confidence + "%";
+      document.getElementById("bar-fake").style.width = data.fake_prob + "%";
+      document.getElementById("bar-real").style.width = data.real_prob + "%";
+      document.getElementById("pct-fake").textContent = data.fake_prob + "%";
+      document.getElementById("pct-real").textContent = data.real_prob + "%";
+
+      card.style.display = "block";
+    }
+  </script>
+</body>
+</html>
