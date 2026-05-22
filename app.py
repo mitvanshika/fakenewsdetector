@@ -1,51 +1,44 @@
-import streamlit as st
+from flask import Flask, request, jsonify, render_template
 import pickle
 import re
-import nltk
-from nltk.corpus import stopwords
 
-nltk.download('stopwords', quiet=True)
-stop_words = set(stopwords.words('english'))
+app = Flask(__name__)
 
-# ── Load saved model & vectorizer ─────────────────────────
-with open("model.pkl", "rb") as f:
-    model = pickle.load(f)
+with open("model/pipeline.pkl", "rb") as f:
+    pipeline = pickle.load(f)
 
-with open("vectorizer.pkl", "rb") as f:
-    vectorizer = pickle.load(f)
-
-# ── Same clean function as before ─────────────────────────
 def clean_text(text):
     text = text.lower()
-    text = re.sub(r'\[.*?\]', '', text)
-    text = re.sub(r'https?://\S+|www\.\S+', '', text)
-    text = re.sub(r'[^a-z\s]', '', text)
-    tokens = text.split()
-    tokens = [w for w in tokens if w not in stop_words]
-    return ' '.join(tokens)
+    text = re.sub(r"http\S+|www\S+", "", text)
+    text = re.sub(r"[^a-zA-Z\s]", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
 
-# ── UI ────────────────────────────────────────────────────
-st.set_page_config(page_title="Fake News Detector", page_icon="🔍")
+@app.route("/")
+def index():
+    return render_template("index.html")
 
-st.title("🔍 Fake News Detector")
-st.write("Paste a news article below and the model will predict whether it's real or fake.")
+@app.route("/predict", methods=["POST"])
+def predict():
+    data = request.get_json()
+    text = data.get("text", "").strip()
 
-user_input = st.text_area("📰 Paste article text here", height=200)
+    if not text or len(text.split()) < 5:
+        return jsonify({"error": "Please enter a longer news text (min 5 words)."}), 400
 
-if st.button("Analyze"):
-    if user_input.strip() == "":
-        st.warning("Please paste some text first!")
-    else:
-        cleaned = clean_text(user_input)
-        vectorized = vectorizer.transform([cleaned])
-        prediction = model.predict(vectorized)[0]
-        score = model.decision_function(vectorized)[0]
-        confidence = min(abs(score) * 20, 100)
+    cleaned = clean_text(text)
+    prediction = pipeline.predict([cleaned])[0]
+    probabilities = pipeline.predict_proba([cleaned])[0]
 
-        if prediction == 1:
-            st.success(f"🟢 REAL NEWS — Confidence: {confidence:.1f}%")
-        else:
-            st.error(f"🔴 FAKE NEWS — Confidence: {confidence:.1f}%")
+    confidence = round(float(max(probabilities)) * 100, 2)
+    label = "REAL" if prediction == 1 else "FAKE"
 
-        with st.expander("See cleaned text"):
-            st.write(cleaned)
+    return jsonify({
+        "label": label,
+        "confidence": confidence,
+        "fake_prob": round(float(probabilities[0]) * 100, 2),
+        "real_prob": round(float(probabilities[1]) * 100, 2)
+    })
+
+if __name__ == "__main__":
+    app.run(debug=True)
