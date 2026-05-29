@@ -34,13 +34,13 @@ X_train, X_test, y_train, y_test = train_test_split(
 pipeline = Pipeline([
     ("tfidf", TfidfVectorizer(
         stop_words="english",
-        max_df=0.7,          # ignore very common words
-        ngram_range=(1, 2),  # unigrams + bigrams
+        max_df=0.7,          
+        ngram_range=(1, 2),  
         max_features=50000
     )),
     ("clf", LogisticRegression(
         max_iter=1000,
-        C=5,                 # regularization strength
+        C=5,                 
         solver="lbfgs",
         n_jobs=-1
     ))
